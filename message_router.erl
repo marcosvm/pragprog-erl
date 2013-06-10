@@ -3,16 +3,21 @@
 
 -module(message_router).
 
--export([send_message/3,route_messages/1, start/1, stop/1]).
+%% defines a constant to reference the message_router
+-define(SERVER, message_router).
+
+-export([send_message/2,route_messages/1, start/1, stop/0]).
 
 start(PrintFun) ->
-  spawn(message_router, route_messages, [PrintFun]).
+  Pid = spawn(message_router, route_messages, [PrintFun]),
+  erlang:register(?SERVER, Pid),
+  Pid.
 
-stop(RouterPid) ->
-  RouterPid ! shutdown.
+stop() ->
+  ?SERVER ! shutdown.
 
-send_message(RouterPid, Addressee, MessageBody) ->
-  RouterPid ! {send_chat_msg, Addressee, MessageBody}.
+send_message(Addressee, MessageBody) ->
+  ?SERVER ! {send_chat_msg, Addressee, MessageBody}.
 
 route_messages(PrintFun) ->
   receive
