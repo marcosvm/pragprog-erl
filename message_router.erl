@@ -9,20 +9,36 @@
 -export([unregister_nick/1, register_nick/2, send_message/2,route_messages/1, start/0, stop/0]).
 
 start() ->
-  Pid = spawn(message_router, route_messages, [dict:new()]),
-  erlang:register(?SERVER, Pid).
+  global:trans({?SERVER, ?SERVER}, %% guarantee atomicity of the operation across nodes.
+    fun() ->
+        case global:whereis_name(?SERVER) of
+          undefined ->
+            Pid = spawn(message_router, route_messages, [dict:new()]),
+            global:register_name(?SERVER, Pid);
+          _ ->
+            ok
+        end
+    end).
 
 stop() ->
-  ?SERVER ! shutdown.
+  global:trans({?SERVER, ?SERVER},
+    fun() ->
+        case global:whereis_name(?SERVER) of
+          undefined ->
+            ok;
+          _ ->
+            global:send(?SERVER, shutdown) %% use global:send instead of ! that is intra-node only
+        end
+    end).
 
 send_message(Addressee, MessageBody) ->
-  ?SERVER ! {send_chat_msg, Addressee, MessageBody}.
+  global:send(?SERVER, {send_chat_msg, Addressee, MessageBody}).
 
 register_nick(ClientName, PrintFun) ->
-  ?SERVER ! {register_nick, ClientName, PrintFun}.
+  global:send(?SERVER, {register_nick, ClientName, PrintFun}).
 
 unregister_nick(ClientName) ->
-  ?SERVER ! {unregister_nick, ClientName}.
+  global:send(?SERVER, {unregister_nick, ClientName}).
 
 route_messages(Clients) ->
   receive
