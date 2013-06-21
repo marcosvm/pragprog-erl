@@ -9,27 +9,10 @@
 -export([unregister_nick/1, register_nick/2, send_message/2,route_messages/1, start/0, stop/0]).
 
 start() ->
-  global:trans({?SERVER, ?SERVER}, %% guarantee atomicity of the operation across nodes.
-    fun() ->
-        case global:whereis_name(?SERVER) of
-          undefined ->
-            Pid = spawn(message_router, route_messages, [dict:new()]),
-            global:register_name(?SERVER, Pid);
-          _ ->
-            ok
-        end
-    end).
+  server_util:start(?SERVER, {message_router, route_messages, [dict:new()]}).
 
 stop() ->
-  global:trans({?SERVER, ?SERVER},
-    fun() ->
-        case global:whereis_name(?SERVER) of
-          undefined ->
-            ok;
-          _ ->
-            global:send(?SERVER, shutdown) %% use global:send instead of ! that is intra-node only
-        end
-    end).
+  server_util:stop(?SERVER).
 
 send_message(Addressee, MessageBody) ->
   global:send(?SERVER, {send_chat_msg, Addressee, MessageBody}).
